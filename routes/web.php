@@ -3,9 +3,10 @@
 $router->post('GetShopPoint','Api@GetShopPoint');
 $router->post('PlayerShopPoint','Api@PlayerShopPoint');
 $router->post('BuyAllItem','Api@BuyAllItem');
+$router->post('BuySingleItem','Api@BuySingleItem');
 $router->post('CreateUser','Api@CreateUser');
 $router->post('UpdatePassword','Api@UpdatePassword');
-$router->post('GetPlayersRank/{id?}','Api@GetPlayersRank');
+$router->post('GetPlayersRank[/{limit}]','Api@GetPlayersRank');
 $router->post('GetPlayers','Api@GetPlayers');
 $router->post('UpdateUserInfo','Api@UpdateUserInfo');
 $router->post('DeleteUser','Api@DeleteUser');

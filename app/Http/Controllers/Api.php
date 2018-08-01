@@ -6,11 +6,14 @@ use Illuminate\Http\Request;
 use App\Models\CharInfo;
 use App\Models\PAuth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class Api extends Controller
 {
     function DeleteUser(Request $req)
     {
+        if ($error = $this->validateInput($req, ['name' => 'required|string']))
+            return $error;
         if ($data = PAuth::where('account', $req->name)->first()) {
             $data->update(['account' => "@$data->account"]);
             return response(['status' => true], 200);
@@ -20,6 +23,8 @@ class Api extends Controller
 
     function unDeleteUser(Request $req)
     {
+        if ($error = $this->validateInput($req, ['name' => 'required|string']))
+            return $error;
         if ($data = PAuth::where('account', "@$req->name")->first()) {
             $data->update(['account' => $req->name]);
             return response(['status' => true], 200);
@@ -29,14 +34,29 @@ class Api extends Controller
 
     function GetShopPoint(Request $req)
     {
+        if ($error = $this->validateInput($req, ['name' => 'required|string']))
+            return $error;
         $data = PAuth::where('account', $req->name)->first();
         return response(['status' => true, 'data' => $data ? $data->point : 0], 200);
     }
 
+    public function validateInput(Request $req, $rules)
+    {
+        $v = Validator::make($req->all(), $rules);
+        if ($v->fails())
+            return response()->json([
+                'status' => false,
+                'msg' => $v->errors()->getMessages()
+            ]);
+        return false;
+    }
+
     public function PlayerShopPoint(Request $req)
     {
+        if ($error = $this->validateInput($req, ['name' => 'required', 'point' => 'required', 'take' => 'required']))
+            return $error;
         if ($data = PAuth::where('account', $req->name)->first()) {
-            $data->point += $req->take == 'true' ? -intval($req->point) : intval($req->point);
+            $data->point += $req->take ? intval(-$req->point) : intval($req->point);
             $data->update(['point' => $data->point]);
             return response(['status' => true], 200);
         }
@@ -45,6 +65,8 @@ class Api extends Controller
 
     public function CreateUser(Request $req)
     {
+        if ($error = $this->validateInput($req, ['username' => 'required', 'email' => 'required|email', 'password' => 'required']))
+            return $error;
         $profile = ['account' => $req->username, 'email' => $req->email, 'password' => $req->password];
         if ($data = PAuth::create($profile))
             return response(['status' => true, 'msg' => $data], 200);
@@ -53,6 +75,8 @@ class Api extends Controller
 
     public function GetItemInfo(Request $req)
     {
+        if ($error = $this->validateInput($req, ['id' => 'required']))
+            return $error;
         if ($data = DB::connection('arcadiadb')->table('ItemResource')->where('id', $req->id)->first()) {
             $string = DB::connection('arcadiadb')->table('StringResource')->select('value')->where('code', $data->name_id)->first();
             $stringEn = DB::connection('arcadiadb')->table('StringResource_en')->select('value')->where('code', $data->name_id)->first();
@@ -69,6 +93,8 @@ class Api extends Controller
 
     public function BuyAllItem(Request $req)
     {
+        if ($error = $this->validateInput($req, ['name' => 'required', 'items' => 'required']))
+            return $error;
         if ($id = PAuth::where('account', $req->name)->first()) {
             foreach ($req->items as $item) {
                 $data = DB::connection('billingdb')->table("PaidItem")->insert([
@@ -90,8 +116,34 @@ class Api extends Controller
         return response(['status' => false], 200);
     }
 
+    public function BuySingleItem(Request $req)
+    {
+        if ($error = $this->validateInput($req, ['name' => 'required', 'item' => 'required', 'count' => 'required']))
+            return $error;
+
+        if ($id = PAuth::where('account', $req->name)->first()) {
+            $data = DB::connection('billingdb')->table("PaidItem")->insert([
+                'buy_id' => 1,
+                'account_id' => $id->account_id,
+                'avatar_id' => 0,
+                'taken_account_id' => $id->account_id,
+                'taken_avatar_id' => 0,
+                'item_code' => $req->item,
+                'item_count' => $req->count,
+                'type' => 1,
+                'rest_item_count' => $req->count,
+                'confirmed' => 1,
+                'isCancel' => 0
+            ]);
+            return response(['status' => true], 200);
+        }
+        return response(['status' => false], 200);
+    }
+
     public function UpdatePassword(Request $req)
     {
+        if ($error = $this->validateInput($req, ['username' => 'required', 'password' => 'required', 'email' => 'required|email']))
+            return $error;
         if ($auth = PAuth::where('account', $req->username)->where('email', $req->email)->first()) {
             if ($auth->update(['password' => $req->password]))
                 return response(['status' => true], 200);
@@ -101,6 +153,8 @@ class Api extends Controller
 
     public function UpdateUserInfo(Request $req)
     {
+        if ($error = $this->validateInput($req, ['username' => 'required', 'email' => 'required|email']))
+            return $error;
         if ($auth = PAuth::where('account_id', $req->id)->first()) {
             if ($auth->update(['account' => $req->username, 'email' => $req->email]))
                 return response(['status' => true], 200);
@@ -115,7 +169,7 @@ class Api extends Controller
 
     function GetPlayersRank($limit = 100)
     {
-        $players = CharInfo::where('name', 'not like', '%@%')->where('permission', '!=', 100)->orderBy('lv', 'desc')->take($limit)
+        $players = CharInfo::where('name', 'not like', '%@%')->select(['lv', 'pkc', 'name', 'job'])->where('permission', '!=', 100)->orderBy('lv', 'desc')->take($limit)
             ->orderBy('exp', 'desc')
             ->orderBy('pkc', 'desc')
             ->get();
